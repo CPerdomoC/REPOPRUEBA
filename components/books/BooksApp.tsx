@@ -106,9 +106,35 @@ export function BooksApp() {
     return data.libros.filter((libro) => libro.estado === filtro);
   }, [data.libros, filtro]);
 
-  const onCreateBook = (event: FormEvent<HTMLFormElement>) => {
+  const fetchSynopsis = async (titulo: string, autor: string): Promise<string | null> => {
+    try {
+      const response = await fetch("/api/libros/sinopsis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ titulo, autor }),
+      });
+
+      if (!response.ok) return null;
+      const payload = (await response.json()) as { sinopsis?: string | null };
+      return payload.sinopsis ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  const onCreateBook = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+
+    if (!form.titulo.trim() || !form.autor.trim() || !form.paisOrigen.trim()) {
+      setError("Debes completar título, autor y país de origen.");
+      return;
+    }
+
+    let sinopsis = form.sinopsis.trim();
+    if (!sinopsis) {
+      sinopsis = (await fetchSynopsis(form.titulo, form.autor)) ?? "";
+    }
 
     try {
       const now = new Date().toISOString();
@@ -119,7 +145,7 @@ export function BooksApp() {
         paisOrigen: form.paisOrigen || null,
         fechaLanzamiento: form.fechaLanzamiento || null,
         fechaInicioLectura: form.fechaInicioLectura || null,
-        sinopsis: form.sinopsis || null,
+        sinopsis: sinopsis || null,
         valoracion: null,
         estado: BOOK_STATUS.PENDIENTE,
         fechaLectura: null,
@@ -167,43 +193,8 @@ export function BooksApp() {
     }
   };
 
-  const fillBookFromInternet = async () => {
-    if (!form.titulo.trim() || !form.autor.trim()) {
-      setError("Debes ingresar título y autor para buscar.");
-      return;
-    }
-
-    setError(null);
-    try {
-      const response = await fetch("/api/libros/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ titulo: form.titulo, autor: form.autor }),
-      });
-
-      if (!response.ok) {
-        setError("No se pudo buscar el libro en OpenLibrary.");
-        return;
-      }
-
-      const payload = (await response.json()) as { libro?: any | null };
-      if (!payload.libro) {
-        setError("Libro no encontrado en OpenLibrary.");
-        return;
-      }
-
-      const libro = payload.libro;
-      setForm((prev) => ({
-        ...prev,
-        titulo: libro.titulo || prev.titulo,
-        autor: libro.autor || prev.autor,
-        fechaLanzamiento: libro.fechaLanzamiento || prev.fechaLanzamiento,
-        sinopsis: libro.sinopsis || prev.sinopsis,
-        paisOrigen: libro.paisOrigen || prev.paisOrigen,
-      }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error desconocido");
-    }
+  const fillSynopsisFromInternet = async (book: Book): Promise<string | null> => {
+    return fetchSynopsis(book.titulo, book.autor);
   };
 
   const markAsRead = async (book: Book) => {
@@ -307,6 +298,7 @@ export function BooksApp() {
               onChange={(e) => setForm((prev) => ({ ...prev, autor: e.target.value }))}
             />
             <input
+              required
               className="rounded-lg border px-3 py-2"
               placeholder="País de origen"
               value={form.paisOrigen}
@@ -330,20 +322,7 @@ export function BooksApp() {
                 setForm((prev) => ({ ...prev, fechaInicioLectura: e.target.value }))
               }
             />
-            <textarea
-              className="rounded-lg border px-3 py-2 sm:col-span-2"
-              placeholder="Sinopsis"
-              value={form.sinopsis}
-              onChange={(e) => setForm((prev) => ({ ...prev, sinopsis: e.target.value }))}
-            />
-            <div className="flex gap-2 sm:col-span-2">
-              <button
-                type="button"
-                onClick={fillBookFromInternet}
-                className="rounded-lg border border-zinc-300 px-4 py-2 font-medium text-zinc-700 transition hover:bg-zinc-50"
-              >
-                Buscar en OpenLibrary
-              </button>
+            <div className="flex flex-wrap gap-2 sm:col-span-2">
               <button
                 type="submit"
                 className="rounded-lg bg-zinc-900 px-4 py-2 font-medium text-white transition hover:bg-zinc-700"

@@ -175,7 +175,7 @@ export async function POST(request: Request) {
       titulo: bookDoc.title || titulo,
       autor: bookDoc.author_name?.[0] || autor,
       fechaLanzamiento: bookDoc.first_publish_year ? `${bookDoc.first_publish_year}-01-01` : null,
-      sinopsis,
+      sinopsis: synopsis,
       paisOrigen: null, // No disponible en search
     };
 

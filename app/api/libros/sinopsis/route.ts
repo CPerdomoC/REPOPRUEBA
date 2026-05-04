@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 type OpenLibrarySearchDoc = {
   key?: string;
+  title?: string;
   first_sentence?: string | { value?: string } | Array<string | { value?: string }>;
   author_name?: string[];
 };
