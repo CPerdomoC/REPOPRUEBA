@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { franc } from "franc";
+import { iso6393To1 } from "iso-639-3";
 
 type OpenLibrarySearchDoc = {
   key?: string;
@@ -91,6 +93,34 @@ const getSynopsisFromDoc = async (doc?: OpenLibrarySearchDoc): Promise<string | 
   return normalizeDescription(workData.description);
 };
 
+const detectLanguage = (text: string): string => {
+  const lang3 = franc(text);
+  if (lang3 === 'und') return 'en'; // Undetermined, assume English
+  return iso6393To1[lang3] || 'en';
+};
+
+const translateText = async (text: string, targetLang: string): Promise<string | null> => {
+  if (targetLang === 'en') return text; // No need to translate
+  try {
+    const response = await fetch('https://libretranslate.com/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        q: text,
+        source: 'en',
+        target: targetLang,
+        format: 'text'
+      }),
+      signal: AbortSignal.timeout(10000), // 10s timeout
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.translatedText || null;
+  } catch {
+    return null;
+  }
+};
+
 const findSynopsisFromOpenLibrary = async (
   titulo: string,
   autor: string,
@@ -125,7 +155,11 @@ const findSynopsisFromOpenLibrary = async (
 
     for (const doc of rankedDocs) {
       const synopsis = await getSynopsisFromDoc(doc);
-      if (synopsis) return synopsis;
+      if (synopsis) {
+        const titleLang = detectLanguage(titulo);
+        const translatedSynopsis = await translateText(synopsis, titleLang);
+        return translatedSynopsis || synopsis; // Fallback to original if translation fails
+      }
     }
   }
 
@@ -159,7 +193,11 @@ const findSynopsisFromOpenLibrary = async (
       });
       for (const doc of rankedDocs) {
         const synopsis = await getSynopsisFromDoc(doc);
-        if (synopsis) return synopsis;
+        if (synopsis) {
+          const titleLang = detectLanguage(titulo);
+          const translatedSynopsis = await translateText(synopsis, titleLang);
+          return translatedSynopsis || synopsis;
+        }
       }
     }
   }

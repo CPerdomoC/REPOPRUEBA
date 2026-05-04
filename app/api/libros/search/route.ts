@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { franc } from "franc";
+import { iso6393To1 } from "iso-639-3";
 
 type OpenLibrarySearchDoc = {
   key?: string;
@@ -93,6 +95,34 @@ const getSynopsisFromDoc = async (doc?: OpenLibrarySearchDoc): Promise<string | 
   return normalizeDescription(workData.description);
 };
 
+const detectLanguage = (text: string): string => {
+  const lang3 = franc(text);
+  if (lang3 === 'und') return 'en'; // Undetermined, assume English
+  return iso6393To1[lang3] || 'en';
+};
+
+const translateText = async (text: string, targetLang: string): Promise<string | null> => {
+  if (targetLang === 'en') return text; // No need to translate
+  try {
+    const response = await fetch('https://libretranslate.com/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        q: text,
+        source: 'en',
+        target: targetLang,
+        format: 'text'
+      }),
+      signal: AbortSignal.timeout(10000), // 10s timeout
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.translatedText || null;
+  } catch {
+    return null;
+  }
+};
+
 const findBookFromOpenLibrary = async (
   titulo: string,
   autor: string,
@@ -175,7 +205,7 @@ export async function POST(request: Request) {
       titulo: bookDoc.title || titulo,
       autor: bookDoc.author_name?.[0] || autor,
       fechaLanzamiento: bookDoc.first_publish_year ? `${bookDoc.first_publish_year}-01-01` : null,
-      sinopsis: synopsis,
+      sinopsis: synopsis ? await translateText(synopsis, detectLanguage(titulo)) || synopsis : null,
       paisOrigen: null, // No disponible en search
     };
 
