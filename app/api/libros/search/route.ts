@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { franc } from "franc";
-import { LanguageCodes } from "iso-639-3";
+import { iso6393To1 } from "iso-639-3";
 
 type OpenLibrarySearchDoc = {
   key?: string;
@@ -98,8 +98,7 @@ const getSynopsisFromDoc = async (doc?: OpenLibrarySearchDoc): Promise<string | 
 const detectLanguage = (text: string): string => {
   const lang3 = franc(text);
   if (lang3 === 'und') return 'en'; // Undetermined, assume English
-  const langEntry = LanguageCodes.find(code => code.iso639_3 === lang3);
-  return langEntry?.iso639_1 || 'en';
+  return iso6393To1[lang3] || 'en';
 };
 
 const translateText = async (text: string, targetLang: string): Promise<string | null> => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import CountrySelect, { COUNTRY_LIST } from "@/components/CountrySelect";
 import { BOOK_STATUS, Book, BookStatus } from "@/features/books/types";
 import { renderBookRatingStars } from "@/features/books/rating";
 
@@ -15,6 +16,7 @@ const initialForm = {
   titulo: "",
   autor: "",
   paisOrigen: "",
+  paisOrigenCodigo: "",
   fechaLanzamiento: "",
   fechaInicioLectura: "",
   sinopsis: "",
@@ -106,17 +108,39 @@ export function BooksApp() {
     return data.libros.filter((libro) => libro.estado === filtro);
   }, [data.libros, filtro]);
 
+  const getCountryLabelByCode = (code: string) => {
+    const country = COUNTRY_LIST.find((item) => item.value === code.toLowerCase());
+    return country?.label ?? "";
+  };
+
+  const getCountryFlagUrl = (code: string | null | undefined) =>
+    code ? `https://flagcdn.com/${code.toLowerCase()}.svg` : null;
+
+  const getCountryLabel = (code: string | null | undefined) =>
+    code ? getCountryLabelByCode(code) : null;
+
+  const getFlagUrlByLabel = (label: string | null | undefined) =>
+    getCountryFlagUrl(
+      COUNTRY_LIST.find((country) => country.label.toLowerCase() === label?.toLowerCase())?.value ?? null,
+    );
+
   const onCreateBook = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
 
+    if (!form.paisOrigenCodigo) {
+      setError("Debes seleccionar el país de origen del libro.");
+      return;
+    }
+
     try {
       const now = new Date().toISOString();
+      const nombrePais = getCountryLabel(form.paisOrigenCodigo) || form.paisOrigen;
       const nuevoLibro: Book = {
         id: crypto.randomUUID(),
         titulo: form.titulo,
         autor: form.autor,
-        paisOrigen: form.paisOrigen || null,
+        paisOrigen: nombrePais || null,
         fechaLanzamiento: form.fechaLanzamiento || null,
         fechaInicioLectura: form.fechaInicioLectura || null,
         sinopsis: form.sinopsis || null,
@@ -203,6 +227,22 @@ export function BooksApp() {
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido");
+    }
+  };
+
+  const fillSynopsisFromInternet = async (book: Book): Promise<string | null> => {
+    try {
+      const response = await fetch("/api/libros/sinopsis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ titulo: book.titulo, autor: book.autor }),
+      });
+
+      if (!response.ok) return null;
+      const payload = (await response.json()) as { sinopsis?: string | null };
+      return payload.sinopsis ?? null;
+    } catch {
+      return null;
     }
   };
 
@@ -306,14 +346,20 @@ export function BooksApp() {
               value={form.autor}
               onChange={(e) => setForm((prev) => ({ ...prev, autor: e.target.value }))}
             />
-            <input
-              className="rounded-lg border px-3 py-2"
-              placeholder="País de origen"
-              value={form.paisOrigen}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, paisOrigen: e.target.value }))
+            <div className="sm:col-span-2">
+            <CountrySelect
+              value={form.paisOrigenCodigo}
+              onChange={(iso2) =>
+                setForm((prev) => ({
+                  ...prev,
+                  paisOrigenCodigo: iso2,
+                  paisOrigen: getCountryLabelByCode(iso2),
+                }))
               }
+              placeholder="Selecciona el país de origen"
+              label="País de origen"
             />
+          </div>
             <input
               type="date"
               className="rounded-lg border px-3 py-2"
@@ -391,7 +437,25 @@ export function BooksApp() {
 
           <ul className="mt-4 space-y-4">
             {librosFiltrados.map((libro) => (
-              <li key={libro.id} className="rounded-xl border p-4">
+            <li key={libro.id} className="group relative rounded-xl border p-4">
+              {libro.paisOrigen ? (
+                <div className="absolute right-4 top-4 flex items-center justify-center">
+                  <div className="h-8 w-8 overflow-hidden rounded-full border border-zinc-200 bg-white shadow-sm">
+                    {getFlagUrlByLabel(libro.paisOrigen) ? (
+                      <img
+                        src={getFlagUrlByLabel(libro.paisOrigen) ?? undefined}
+                        alt={`Bandera de ${libro.paisOrigen}`}
+                        title={`Bandera de ${libro.paisOrigen}`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center bg-zinc-100 text-xs font-semibold text-zinc-500">
+                        {libro.paisOrigen?.trim()[0]?.toUpperCase() ?? "?"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : null}
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="text-lg font-semibold">{libro.titulo}</h3>
