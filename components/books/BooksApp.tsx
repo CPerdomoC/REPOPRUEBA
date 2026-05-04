@@ -143,7 +143,7 @@ export function BooksApp() {
         paisOrigen: nombrePais || null,
         fechaLanzamiento: form.fechaLanzamiento || null,
         fechaInicioLectura: form.fechaInicioLectura || null,
-        sinopsis: form.sinopsis || null,
+        sinopsis: sinopsis || null,
         valoracion: null,
         estado: BOOK_STATUS.PENDIENTE,
         fechaLectura: null,
@@ -191,43 +191,8 @@ export function BooksApp() {
     }
   };
 
-  const fillBookFromInternet = async () => {
-    if (!form.titulo.trim() || !form.autor.trim()) {
-      setError("Debes ingresar título y autor para buscar.");
-      return;
-    }
-
-    setError(null);
-    try {
-      const response = await fetch("/api/libros/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ titulo: form.titulo, autor: form.autor }),
-      });
-
-      if (!response.ok) {
-        setError("No se pudo buscar el libro en OpenLibrary.");
-        return;
-      }
-
-      const payload = (await response.json()) as { libro?: any | null };
-      if (!payload.libro) {
-        setError("Libro no encontrado en OpenLibrary.");
-        return;
-      }
-
-      const libro = payload.libro;
-      setForm((prev) => ({
-        ...prev,
-        titulo: libro.titulo || prev.titulo,
-        autor: libro.autor || prev.autor,
-        fechaLanzamiento: libro.fechaLanzamiento || prev.fechaLanzamiento,
-        sinopsis: libro.sinopsis || prev.sinopsis,
-        paisOrigen: libro.paisOrigen || prev.paisOrigen,
-      }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error desconocido");
-    }
+  const fillSynopsisFromInternet = async (book: Book): Promise<string | null> => {
+    return fetchSynopsis(book.titulo, book.autor);
   };
 
   const fillSynopsisFromInternet = async (book: Book): Promise<string | null> => {
@@ -376,20 +341,7 @@ export function BooksApp() {
                 setForm((prev) => ({ ...prev, fechaInicioLectura: e.target.value }))
               }
             />
-            <textarea
-              className="rounded-lg border px-3 py-2 sm:col-span-2"
-              placeholder="Sinopsis"
-              value={form.sinopsis}
-              onChange={(e) => setForm((prev) => ({ ...prev, sinopsis: e.target.value }))}
-            />
-            <div className="flex gap-2 sm:col-span-2">
-              <button
-                type="button"
-                onClick={fillBookFromInternet}
-                className="rounded-lg border border-zinc-300 px-4 py-2 font-medium text-zinc-700 transition hover:bg-zinc-50"
-              >
-                Buscar en OpenLibrary
-              </button>
+            <div className="flex flex-wrap gap-2 sm:col-span-2">
               <button
                 type="submit"
                 className="rounded-lg bg-zinc-900 px-4 py-2 font-medium text-white transition hover:bg-zinc-700"
