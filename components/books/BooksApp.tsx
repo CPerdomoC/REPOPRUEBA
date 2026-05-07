@@ -143,7 +143,7 @@ export function BooksApp() {
         paisOrigen: nombrePais || null,
         fechaLanzamiento: form.fechaLanzamiento || null,
         fechaInicioLectura: form.fechaInicioLectura || null,
-        sinopsis: sinopsis || null,
+        sinopsis: null,
         valoracion: null,
         estado: BOOK_STATUS.PENDIENTE,
         fechaLectura: null,
@@ -191,9 +191,7 @@ export function BooksApp() {
     }
   };
 
-  const fillSynopsisFromInternet = async (book: Book): Promise<string | null> => {
-    return fetchSynopsis(book.titulo, book.autor);
-  };
+
 
   const fillSynopsisFromInternet = async (book: Book): Promise<string | null> => {
     try {
